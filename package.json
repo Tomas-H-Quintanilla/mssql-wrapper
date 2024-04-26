@@ -9,7 +9,7 @@
     "eslint-plugin-promise": "^6.1.1",
     "globals": "^15.0.0"
   },
-  "name": "mssql-wrapper",
+  "name": "mssql-wrapper-v2",
   "description": "Simplified wrapper for mssql in Nodejs.",
   "version": "1.0.1",
   "main": "index.js",

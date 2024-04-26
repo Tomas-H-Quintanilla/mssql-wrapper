@@ -1,18 +1,28 @@
-import sql from 'mssql'
-import { obtainDb } from '../database-connection'
+const sql = require('mssql')
+const { getConnection } = require('../database-connection')
 
-export async function obtainTransaction () {
-  const db = await obtainDb()
-  const transaction = db.transaction()
+
+/**
+ * Creates a transaction, starts it and returns it to the user
+ * @returns {object}: Transaction to the user
+ */
+async function getTransaction () {
+  const connection = await getConnection()
+  const transaction = connection.transaction()
+
+
   await transaction.begin()
+  transaction.isActive = true
   return transaction
 }
 
-export function getOperations (transaction) {
-  return transaction.isActive ? new sql.Request(transaction) : null
-}
 
-export async function closeTransaction (transaction, option) {
+/**
+ * Closes and releases the transaction
+ * @param {object} transaction: transacion to be released
+ * @param {string} option: commit or rollback
+ */
+async function releaseTransaction (transaction, option) {
   if (option === 'commit') {
     await transaction.commit()
   } else if (option === 'rollback') {
@@ -20,19 +30,40 @@ export async function closeTransaction (transaction, option) {
   }
   if (transaction.isActive) {
     await transaction.release()
+    transaction.isActive = false
+
   }
 }
 
 /**
- * Same system as the execute query function to retrieve data
- * @param {object} operations operations to which the transaction is linked
- * @param {string} query
+ * Creates an sql request for the transaction
+ * @param {object} transaction
+ * @returns {object}
+ */
+function getTransactionRequest (transaction) {
+  return transaction.isActive ? new sql.Request(transaction) : null
+}
+
+
+/**
+ * Amits any SQL query and an operation set and returns an object that contains:
+ * - success: Query was successfully executed
+ * - message: Message of whether the query had errors
+ * - data: Array cointaining the recordset obtained from he query
+ * - rowCount: Number of rows affected by the query
+ * - error: Error encountered during the execution of the query
+ * - query: Query performed
+ * - timeStart: Timestamp in milliseconds when the query was started
+ * - timeEnd: Timestamp in milliseconds when the query was finished
+ * - executionTime: Time needed to execute the query
+ * @param {object} request in order to execute the transaction query
+ * @param {string} query Valid SQL query. No characters will be scaped
  * @returns {object} Results as in execute query object
  */
-export async function executeTransaction (operations, query) {
+async function executeTransaction (request, query) {
   const response = { success: false, data: [], rowCount: 0, error: null }
   try {
-    const results = await operations.query(query)
+    const results = await request.query(query)
 
     response.rowCount = results.rowsAffected[0]
     response.data = results.recordsets === undefined ? [] : results.recordsets[0]
@@ -45,3 +76,5 @@ export async function executeTransaction (operations, query) {
   }
   return response
 }
+
+module.exports={executeTransaction,getTransaction,releaseTransaction,getTransactionRequest}
